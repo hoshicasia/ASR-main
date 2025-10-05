@@ -7,10 +7,11 @@ torch_audiomentations
 tqdm
 matplotlib
 pandas
-wandb
 comet_ml
 hydra-core
+torchmetrics
 
+wget
 black
 isort
 pre-commit

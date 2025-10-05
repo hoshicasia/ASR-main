@@ -48,7 +48,7 @@ class BaseTrainer:
             dataloaders (dict[DataLoader]): dataloaders for different
                 sets of data.
             logger (Logger): logger that logs output.
-            writer (WandBWriter | CometMLWriter): experiment tracker.
+            writer (CometMLWriter): experiment tracker.
             epoch_len (int | None): number of steps in each epoch for
                 iteration-based training. If None, use epoch-based
                 training (len(dataloader)).

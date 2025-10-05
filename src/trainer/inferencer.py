@@ -120,11 +120,8 @@ class Inferencer(BaseTrainer):
                 the dataloader (possibly transformed via batch transform)
                 and model outputs.
         """
-        # TODO change inference logic so it suits ASR assignment
-        # and task pipeline
-
         batch = self.move_batch_to_device(batch)
-        batch = self.transform_batch(batch)  # transform batch on device -- faster
+        batch = self.transform_batch(batch)
 
         outputs = self.model(**batch)
         batch.update(outputs)
@@ -133,28 +130,30 @@ class Inferencer(BaseTrainer):
             for met in self.metrics["inference"]:
                 metrics.update(met.name, met(**batch))
 
-        # Some saving logic. This is an example
-        # Use if you need to save predictions on disk
+        if self.save_path is not None:
+            log_probs = batch["log_probs"].cpu()
+            log_probs_length = batch["log_probs_length"].cpu()
 
-        batch_size = batch["logits"].shape[0]
-        current_id = batch_idx * batch_size
+            argmax_inds = log_probs.argmax(-1).numpy()
+            argmax_inds = [
+                inds[: int(ind_len)]
+                for inds, ind_len in zip(argmax_inds, log_probs_length.numpy())
+            ]
 
-        for i in range(batch_size):
-            # clone because of
-            # https://github.com/pytorch/pytorch/issues/1995
-            logits = batch["logits"][i].clone()
-            label = batch["labels"][i].clone()
-            pred_label = logits.argmax(dim=-1)
+            predictions = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
 
-            output_id = current_id + i
+            batch_size = log_probs.shape[0]
+            current_id = batch_idx * batch_size
 
-            output = {
-                "pred_label": pred_label,
-                "label": label,
-            }
+            for i in range(batch_size):
+                output_id = current_id + i
 
-            if self.save_path is not None:
-                # you can use safetensors or other lib here
+                output = {
+                    "prediction": predictions[i],
+                    "target": batch["text"][i],
+                    "audio_path": batch.get("audio_path", [None] * batch_size)[i],
+                }
+
                 torch.save(output, self.save_path / part / f"output_{output_id}.pth")
 
         return batch

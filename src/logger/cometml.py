@@ -131,8 +131,6 @@ class CometMLWriter:
             checkpoint_path (str): path to the checkpoint file.
             save_dir (str): path to the dir, where checkpoint is saved.
         """
-        # For comet, save dir is not required
-        # It is kept for consistency with WandB
         self.exp.log_model(
             name="checkpoints", file_or_folder=checkpoint_path, overwrite=True
         )
@@ -219,9 +217,6 @@ class CometMLWriter:
                 histogram of.
             bins (int | str): the definition of bins for the histogram.
         """
-        # For comet, bins argument is not required
-        # It is kept for consistency with WandB
-
         values_for_hist = values_for_hist.detach().cpu().numpy()
 
         # np_hist = np.histogram(values_for_hist, bins=bins)

@@ -1,14 +1,18 @@
 import json
 import os
 import shutil
+import ssl
+import urllib.request
 from pathlib import Path
 
 import torchaudio
-import wget
 from tqdm import tqdm
 
 from src.datasets.base_dataset import BaseDataset
 from src.utils.io_utils import ROOT_PATH
+
+ssl._create_default_https_context = ssl._create_unverified_context
+
 
 URL_LINKS = {
     "dev-clean": "https://www.openslr.org/resources/12/dev-clean.tar.gz",
@@ -46,7 +50,29 @@ class LibrispeechDataset(BaseDataset):
     def _load_part(self, part):
         arch_path = self._data_dir / f"{part}.tar.gz"
         print(f"Loading part {part}")
-        wget.download(URL_LINKS[part], str(arch_path))
+
+        url = URL_LINKS[part]
+        context = ssl._create_unverified_context()
+
+        with urllib.request.urlopen(url, context=context) as response:
+            total_size = int(response.headers.get("content-length", 0))
+            block_size = 8192
+
+            with open(arch_path, "wb") as out_file:
+                with tqdm(
+                    total=total_size,
+                    unit="B",
+                    unit_scale=True,
+                    desc=f"Downloading {part}",
+                ) as pbar:
+                    while True:
+                        chunk = response.read(block_size)
+                        if not chunk:
+                            break
+                        out_file.write(chunk)
+                        pbar.update(len(chunk))
+
+        print(f"Extracting {part}...")
         shutil.unpack_archive(arch_path, self._data_dir)
         for fpath in (self._data_dir / "LibriSpeech").iterdir():
             shutil.move(str(fpath), str(self._data_dir / fpath.name))
