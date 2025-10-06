@@ -26,6 +26,7 @@ class Inferencer(BaseTrainer):
         save_path,
         metrics=None,
         batch_transforms=None,
+        logger=None,
         skip_model_load=False,
     ):
         """
@@ -46,6 +47,7 @@ class Inferencer(BaseTrainer):
             batch_transforms (dict[nn.Module] | None): transforms that
                 should be applied on the whole batch. Depend on the
                 tensor name.
+            logger (Logger | None): logger for logging inference progress.
             skip_model_load (bool): if False, require the user to set
                 pre-trained checkpoint path. Set this argument to True if
                 the model desirable weights are defined outside of the
@@ -64,6 +66,7 @@ class Inferencer(BaseTrainer):
         self.batch_transforms = batch_transforms
 
         self.text_encoder = text_encoder
+        self.logger = logger
 
         # define dataloaders
         self.evaluation_dataloaders = {k: v for k, v in dataloaders.items()}
@@ -191,4 +194,9 @@ class Inferencer(BaseTrainer):
                     metrics=self.evaluation_metrics,
                 )
 
-        return self.evaluation_metrics.result()
+        results = self.evaluation_metrics.result()
+        if self.logger:
+            for key, value in results.items():
+                self.logger.info(f"  {key}: {value}")
+
+        return results

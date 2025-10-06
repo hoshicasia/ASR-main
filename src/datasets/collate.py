@@ -2,16 +2,16 @@ import torch
 
 
 def collate_fn(dataset_items: list[dict]):
-    """Collate a batch of dataset items.
-
-    Pads variable-length tensors (audio, spectrogram, text encodings)
-    and aggregates the rest of the metadata into a batch dictionary.
+    """
+    Collate and pad fields in the dataset items.
+    Converts individual items into a batch.
 
     Args:
-        dataset_items (list[dict]): Items produced by the dataset.
-
+        dataset_items (list[dict]): list of objects from
+            dataset.__getitem__.
     Returns:
-        dict: Batched tensors and metadata ready for the model and loss.
+        result_batch (dict[Tensor]): dict, containing batch-version
+            of the tensors.
     """
 
     batch_size = len(dataset_items)
@@ -55,7 +55,7 @@ def collate_fn(dataset_items: list[dict]):
     text = [item["text"] for item in dataset_items]
     audio_paths = [item["audio_path"] for item in dataset_items]
 
-    batch = {
+    result_batch = {
         "audio": audio_batch,
         "audio_length": audio_lengths,
         "spectrogram": spectrogram_batch,
@@ -66,4 +66,4 @@ def collate_fn(dataset_items: list[dict]):
         "audio_path": audio_paths,
     }
 
-    return batch
+    return result_batch

@@ -1,10 +1,13 @@
+import logging
 import warnings
 
 import hydra
 import torch
 from hydra.utils import instantiate
+from omegaconf import OmegaConf
 
 from src.datasets.data_utils import get_dataloaders
+from src.logger.logger import setup_logging
 from src.trainer import Inferencer
 from src.utils.init_utils import set_random_seed
 from src.utils.io_utils import ROOT_PATH
@@ -24,6 +27,18 @@ def main(config):
     """
     set_random_seed(config.inferencer.seed)
 
+    save_dir = (
+        ROOT_PATH
+        / config.inferencer.get("save_dir", "saved")
+        / "inference"
+        / config.inferencer.get("run_name", "default")
+    )
+    save_dir.mkdir(exist_ok=True, parents=True)
+    OmegaConf.save(config, save_dir / "config.yaml")
+    setup_logging(save_dir, append=False)
+    logger = logging.getLogger("inference")
+    logger.setLevel(logging.INFO)
+
     if config.inferencer.device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
     else:
@@ -38,7 +53,7 @@ def main(config):
 
     # build model architecture, then print to console
     model = instantiate(config.model, n_tokens=len(text_encoder)).to(device)
-    print(model)
+    logger.info(model)
 
     # get metrics
     metrics = {"inference": []}
@@ -61,15 +76,22 @@ def main(config):
         batch_transforms=batch_transforms,
         save_path=save_path,
         metrics=metrics,
+        logger=logger,
         skip_model_load=False,
     )
 
     logs = inferencer.run_inference()
 
+    logger.info("=" * 50)
+    logger.info("Inference Results:")
+    logger.info("=" * 50)
     for part in logs.keys():
+        logger.info(f"\n{part.upper()} partition:")
         for key, value in logs[part].items():
             full_key = part + "_" + key
-            print(f"    {full_key:15s}: {value}")
+            logger.info(f"    {full_key:15s}: {value}")
+
+    logger.info("\nInference completed successfully!")
 
 
 if __name__ == "__main__":
