@@ -59,7 +59,7 @@ class LibrispeechDataset(BaseDataset):
 
         dataset = load_dataset(
             "librispeech_asr",
-            split=part,
+            split=part.replace("-", "."),
             download_mode=DownloadMode.REUSE_DATASET_IF_EXISTS,
         )
         index = []
