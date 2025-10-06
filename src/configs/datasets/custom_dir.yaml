@@ -1,0 +1,27 @@
+# This dataset loads audio files from a custom directory with the following structure:
+# data_dir/
+# ├── audio/
+# │   ├── UtteranceID1.wav  # may be .flac, .mp3, .m4a
+# │   ├── UtteranceID2.wav
+# │   └── ...
+# └── transcriptions/  # optional
+#     ├── UtteranceID1.txt
+#     ├── UtteranceID2.txt
+#     └── ...
+#
+# HOw to use:
+# python train.py datasets=custom_dir datasets.train.data_dir=/path/to/your/data
+
+train:
+  _target_: src.datasets.CustomDirAudioDataset
+  data_dir: "test_data"  #your directory path
+  max_audio_length: 20.0
+  max_text_length: 200
+  instance_transforms: ${transforms.instance_transforms.train}
+
+val:
+  _target_: src.datasets.CustomDirAudioDataset
+  data_dir: "test_data"  #your directory path
+  max_audio_length: 20.0
+  max_text_length: 200
+  instance_transforms: ${transforms.instance_transforms.inference}

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 from tqdm.auto import tqdm
 
@@ -143,18 +145,16 @@ class Inferencer(BaseTrainer):
             predictions = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
 
             batch_size = log_probs.shape[0]
-            current_id = batch_idx * batch_size
+            audio_paths = batch.get("audio_path", [None] * batch_size)
 
             for i in range(batch_size):
-                output_id = current_id + i
-
-                output = {
-                    "prediction": predictions[i],
-                    "target": batch["text"][i],
-                    "audio_path": batch.get("audio_path", [None] * batch_size)[i],
-                }
-
-                torch.save(output, self.save_path / part / f"output_{output_id}.pth")
+                prediction_text = predictions[i]
+                audio_path = audio_paths[i]
+                # now we match utterance id to audio file name if possible and save as txt
+                utterance_id = Path(audio_path).stem
+                output_file = self.save_path / part / f"{utterance_id}.txt"
+                with output_file.open("w", encoding="utf-8") as f:
+                    f.write(prediction_text)
 
         return batch
 

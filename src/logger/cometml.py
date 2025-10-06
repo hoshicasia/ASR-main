@@ -174,6 +174,13 @@ class CometMLWriter:
             image (Path | Tensor | ndarray | list[tuple] | Image): image
                 in the CometML-friendly format.
         """
+        if hasattr(image, "detach"):
+            image = image.detach().cpu().numpy()
+            if image.ndim == 3:
+                image = image.transpose(1, 2, 0)
+                if image.shape[2] == 4:
+                    image = image[:, :, :3]
+
         self.exp.log_image(
             image_data=image, name=self._object_name(image_name), step=self.step
         )
@@ -184,14 +191,15 @@ class CometMLWriter:
 
         Args:
             audio_name (str): name of the audio to use in the tracker.
-            audio (Path | ndarray): audio in the CometML-friendly format.
+            audio (Path | ndarray | Tensor): audio in the CometML-friendly format.
             sample_rate (int): audio sample rate.
         """
         audio = audio.detach().cpu().numpy().T
+
         self.exp.log_audio(
-            file_name=self._object_name(audio_name),
             audio_data=audio,
             sample_rate=sample_rate,
+            file_name=self._object_name(audio_name),
             step=self.step,
         )
 

@@ -1,0 +1,4 @@
+_target_: torch.utils.data.DataLoader
+batch_size: 2
+shuffle: true
+num_workers: 2

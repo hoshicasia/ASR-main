@@ -3,7 +3,7 @@ defaults:
   - writer: cometml
   - metrics: example
   - datasets: onebatchtest
-  - dataloader: example
+  - dataloader: librispeech
   - transforms: example_only_instance
   - _self_
 optimizer:

@@ -1,83 +1,44 @@
 import json
 import os
-import shutil
-import ssl
-import urllib.request
 from pathlib import Path
 
+import torch
 import torchaudio
 from tqdm import tqdm
 
+from datasets import DownloadMode, load_dataset
 from src.datasets.base_dataset import BaseDataset
 from src.utils.io_utils import ROOT_PATH
-
-ssl._create_default_https_context = ssl._create_unverified_context
-
-
-URL_LINKS = {
-    "dev-clean": "https://www.openslr.org/resources/12/dev-clean.tar.gz",
-    "dev-other": "https://www.openslr.org/resources/12/dev-other.tar.gz",
-    "test-clean": "https://www.openslr.org/resources/12/test-clean.tar.gz",
-    "test-other": "https://www.openslr.org/resources/12/test-other.tar.gz",
-    "train-clean-100": "https://www.openslr.org/resources/12/train-clean-100.tar.gz",
-    "train-clean-360": "https://www.openslr.org/resources/12/train-clean-360.tar.gz",
-    "train-other-500": "https://www.openslr.org/resources/12/train-other-500.tar.gz",
-}
 
 
 class LibrispeechDataset(BaseDataset):
     def __init__(self, part, data_dir=None, *args, **kwargs):
-        assert part in URL_LINKS or part == "train_all"
+        valid_parts = [
+            "dev-clean",
+            "dev-other",
+            "test-clean",
+            "test-other",
+            "train-clean-100",
+            "train-clean-360",
+            "train-other-500",
+            "train_all",
+        ]
+        assert part in valid_parts
 
         if data_dir is None:
             data_dir = ROOT_PATH / "data" / "datasets" / "librispeech"
             data_dir.mkdir(exist_ok=True, parents=True)
         self._data_dir = data_dir
+
         if part == "train_all":
-            index = sum(
-                [
-                    self._get_or_load_index(part)
-                    for part in URL_LINKS
-                    if "train" in part
-                ],
-                [],
-            )
+            index = []
+            train_parts = ["train-clean-100", "train-clean-360", "train-other-500"]
+            for train_part in train_parts:
+                index.extend(self._get_or_load_index(train_part))
         else:
             index = self._get_or_load_index(part)
 
         super().__init__(index, *args, **kwargs)
-
-    def _load_part(self, part):
-        arch_path = self._data_dir / f"{part}.tar.gz"
-        print(f"Loading part {part}")
-
-        url = URL_LINKS[part]
-        context = ssl._create_unverified_context()
-
-        with urllib.request.urlopen(url, context=context) as response:
-            total_size = int(response.headers.get("content-length", 0))
-            block_size = 8192
-
-            with open(arch_path, "wb") as out_file:
-                with tqdm(
-                    total=total_size,
-                    unit="B",
-                    unit_scale=True,
-                    desc=f"Downloading {part}",
-                ) as pbar:
-                    while True:
-                        chunk = response.read(block_size)
-                        if not chunk:
-                            break
-                        out_file.write(chunk)
-                        pbar.update(len(chunk))
-
-        print(f"Extracting {part}...")
-        shutil.unpack_archive(arch_path, self._data_dir)
-        for fpath in (self._data_dir / "LibriSpeech").iterdir():
-            shutil.move(str(fpath), str(self._data_dir / fpath.name))
-        os.remove(str(arch_path))
-        shutil.rmtree(str(self._data_dir / "LibriSpeech"))
 
     def _get_or_load_index(self, part):
         index_path = self._data_dir / f"{part}_index.json"
@@ -91,32 +52,40 @@ class LibrispeechDataset(BaseDataset):
         return index
 
     def _create_index(self, part):
-        index = []
-        split_dir = self._data_dir / part
-        if not split_dir.exists():
-            self._load_part(part)
+        print(f"Loading dataset part: {part}")
 
-        flac_dirs = set()
-        for dirpath, dirnames, filenames in os.walk(str(split_dir)):
-            if any([f.endswith(".flac") for f in filenames]):
-                flac_dirs.add(dirpath)
-        for flac_dir in tqdm(
-            list(flac_dirs), desc=f"Preparing librispeech folders: {part}"
+        dataset = load_dataset(
+            "librispeech_asr",
+            split=part,
+            download_mode=DownloadMode.REUSE_DATASET_IF_EXISTS,
+        )
+        index = []
+        for i, item in tqdm(
+            enumerate(dataset), total=len(dataset), desc=f"Processing {part}"
         ):
-            flac_dir = Path(flac_dir)
-            trans_path = list(flac_dir.glob("*.trans.txt"))[0]
-            with trans_path.open() as f:
-                for line in f:
-                    f_id = line.split()[0]
-                    f_text = " ".join(line.split()[1:]).strip()
-                    flac_path = flac_dir / f"{f_id}.flac"
-                    t_info = torchaudio.info(str(flac_path))
-                    length = t_info.num_frames / t_info.sample_rate
-                    index.append(
-                        {
-                            "path": str(flac_path.absolute().resolve()),
-                            "text": f_text.lower(),
-                            "audio_len": length,
-                        }
-                    )
+            audio = item["audio"]
+            text = item["text"]
+
+            waveform = audio["array"]
+            sample_rate = audio["sampling_rate"]
+            length = len(waveform) / sample_rate
+
+            audio_path = self._data_dir / f"{part}_{i}.flac"
+
+            if not audio_path.exists():
+                if waveform.ndim == 1:
+                    waveform_tensor = torch.tensor(waveform).unsqueeze(0)
+                else:
+                    waveform_tensor = torch.tensor(waveform).T
+
+                torchaudio.save(str(audio_path), waveform_tensor, sample_rate)
+
+            index.append(
+                {
+                    "path": str(audio_path.absolute().resolve()),
+                    "text": text.lower(),
+                    "audio_len": length,
+                }
+            )
+
         return index
