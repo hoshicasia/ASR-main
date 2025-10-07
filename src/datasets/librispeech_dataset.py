@@ -46,9 +46,11 @@ class LibrispeechDataset(BaseDataset):
     def _get_or_load_index(self, part):
         index_path = self._data_dir / f"{part}_index.json"
         if index_path.exists():
+            print(f"Loading index from cache: {index_path}")
             with index_path.open() as f:
                 index = json.load(f)
         else:
+            print(f"Index not found, creating new index for: {part}")
             index = self._create_index(part)
             with index_path.open("w") as f:
                 json.dump(index, f, indent=2)
@@ -57,22 +59,32 @@ class LibrispeechDataset(BaseDataset):
     def _create_index(self, part):
         print(f"Loading dataset part: {part}")
 
-        config = "clean" if "clean" in part else "other"
-        split_mapping = {
-            "train-clean-100": "train.100",
-            "train-clean-360": "train.360",
-            "train-other-500": "train.500",
-            "dev-clean": "validation",
-            "dev-other": "validation",
-            "test-clean": "test",
-            "test-other": "test",
+        config_mapping = {
+            "train-clean-100": ("clean", "train.100"),
+            "train-clean-360": ("clean", "train.360"),
+            "train-other-500": ("other", "train.500"),
+            "dev-clean": ("clean", "validation"),
+            "dev-other": ("other", "validation"),
+            "test-clean": ("clean", "test"),
+            "test-other": ("other", "test"),
         }
 
+        if part not in config_mapping:
+            raise ValueError(
+                f"Unknown part: {part}. Valid parts: {list(config_mapping.keys())}"
+            )
+
+        config, split = config_mapping[part]
+
+        print(
+            f"Loading HuggingFace dataset: librispeech_asr, config='{config}', split='{split}'"
+        )
         dataset = load_dataset(
             "librispeech_asr",
             config,
-            split=split_mapping.get(part, part.replace("-", ".")),
+            split=split,
             download_mode=DownloadMode.REUSE_DATASET_IF_EXISTS,
+            streaming=True,
         )
         index = []
         for i, item in tqdm(
