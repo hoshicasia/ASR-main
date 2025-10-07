@@ -57,9 +57,21 @@ class LibrispeechDataset(BaseDataset):
     def _create_index(self, part):
         print(f"Loading dataset part: {part}")
 
+        config = "clean" if "clean" in part else "other"
+        split_mapping = {
+            "train-clean-100": "train.100",
+            "train-clean-360": "train.360",
+            "train-other-500": "train.500",
+            "dev-clean": "validation",
+            "dev-other": "validation",
+            "test-clean": "test",
+            "test-other": "test",
+        }
+
         dataset = load_dataset(
             "librispeech_asr",
-            split=part.replace("-", "."),
+            config,
+            split=split_mapping.get(part, part.replace("-", ".")),
             download_mode=DownloadMode.REUSE_DATASET_IF_EXISTS,
         )
         index = []
