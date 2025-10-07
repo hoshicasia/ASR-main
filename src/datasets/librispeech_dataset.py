@@ -87,9 +87,8 @@ class LibrispeechDataset(BaseDataset):
             streaming=True,
         )
         index = []
-        for i, item in tqdm(
-            enumerate(dataset), total=len(dataset), desc=f"Processing {part}"
-        ):
+
+        for i, item in tqdm(enumerate(dataset), desc=f"Processing {part}"):
             audio = item["audio"]
             text = item["text"]
 
