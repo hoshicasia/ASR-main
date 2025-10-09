@@ -2,7 +2,7 @@ torch==2.5.0
 torchvision==0.20.0
 torchaudio==2.5.0
 soundfile
-numpy==1.26.4
+numpy==1.23
 torch_audiomentations
 tqdm
 matplotlib
@@ -10,8 +10,8 @@ pandas
 comet_ml
 hydra-core
 torchmetrics
-datasets
-torchcodec
+datasets==2.15.0
+torchcodec==0.1.0
 
 wget
 black

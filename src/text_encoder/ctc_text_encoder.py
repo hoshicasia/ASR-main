@@ -1,6 +1,8 @@
 import re
+from collections import defaultdict
 from string import ascii_lowercase
 
+import numpy as np
 import torch
 
 # TODO add CTC decode
@@ -67,6 +69,73 @@ class CTCTextEncoder:
                 result.append(self.ind2char[ind])
             prev_ind = ind
         return "".join(result).strip()
+
+    def ctc_argmax_decode(self, log_probs, log_probs_length):
+        decoded_texts = []
+        raw_texts = []
+        for i in range(len(log_probs)):
+            length = log_probs_length[i]
+            lp = log_probs[i][:length]
+            argmax_pred = torch.argmax(lp, dim=-1)
+
+            decoded_texts.append(self.ctc_decode(argmax_pred))
+            raw_texts.append(self.decode(argmax_pred))
+        return decoded_texts, raw_texts
+
+    def ctc_beam_search_decode(self, probs, probs_length, beam_width=10):
+        results = []
+        if isinstance(probs, torch.Tensor):
+            probs = probs.detach().cpu().numpy()
+
+        for i in range(len(probs)):
+            log_probs = probs[i][: probs_length[i]]
+            T, vocab_size = log_probs.shape
+
+            beam = {(): (0.0, float("-inf"))}
+
+            for t in range(T):
+                new_beam = defaultdict(lambda: (float("-inf"), float("-inf")))
+
+                for prefix, (p_b, p_nb) in beam.items():
+                    p_blank = log_probs[t, 0]
+                    new_p_b, new_p_nb = new_beam[prefix]
+                    new_p_b = np.logaddexp(new_p_b, np.logaddexp(p_b, p_nb) + p_blank)
+                    new_beam[prefix] = (new_p_b, new_p_nb)
+
+                    for c in range(1, vocab_size):
+                        p_c = log_probs[t, c]
+                        new_prefix = prefix + (c,)
+                        new_p_b, new_p_nb = new_beam[new_prefix]
+                        if len(prefix) > 0 and prefix[-1] == c:
+                            new_p_nb = np.logaddexp(new_p_nb, p_b + p_c)
+                        else:
+                            new_p_nb = np.logaddexp(
+                                new_p_nb, np.logaddexp(p_b, p_nb) + p_c
+                            )
+
+                        new_beam[new_prefix] = (new_p_b, new_p_nb)
+
+                    if len(prefix) > 0:
+                        last_c = prefix[-1]
+                        p_c = log_probs[t, last_c]
+                        new_p_b, new_p_nb = new_beam[prefix]
+                        new_p_nb = np.logaddexp(new_p_nb, p_nb + p_c)
+                        new_beam[prefix] = (new_p_b, new_p_nb)
+
+                beam = dict(
+                    sorted(
+                        new_beam.items(),
+                        key=lambda x: np.logaddexp(x[1][0], x[1][1]),
+                        reverse=True,
+                    )[:beam_width]
+                )
+
+            best_prefix = max(
+                beam.items(), key=lambda x: np.logaddexp(x[1][0], x[1][1])
+            )[0]
+            decoded_text = "".join([self.ind2char[c] for c in best_prefix])
+            results.append(decoded_text.strip())
+        return results
 
     @staticmethod
     def normalize_text(text: str):

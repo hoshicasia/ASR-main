@@ -1,5 +1,5 @@
 _target_: src.model.Conformer
-n_feats: 128  # This will be overridden by the actual spectrogram size
+n_feats: 128
 n_tokens: 28
 input_dim: 144
 num_heads: 4

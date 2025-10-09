@@ -13,6 +13,44 @@ class Trainer(BaseTrainer):
     Trainer class. Defines the logic of batch logging and processing.
     """
 
+    def __init__(
+        self,
+        model,
+        criterion,
+        metrics,
+        optimizer,
+        lr_scheduler,
+        text_encoder,
+        config,
+        device,
+        dataloaders,
+        logger,
+        writer,
+        epoch_len=None,
+        skip_oom=True,
+        batch_transforms=None,
+    ):
+        super().__init__(
+            model,
+            criterion,
+            metrics,
+            optimizer,
+            lr_scheduler,
+            text_encoder,
+            config,
+            device,
+            dataloaders,
+            logger,
+            writer,
+            epoch_len,
+            skip_oom,
+            batch_transforms,
+        )
+        self.decoding_strategy = self.cfg_trainer.get("decoding_strategy", "argmax")
+        self.beam_search_beam_width = self.cfg_trainer.get(
+            "beam_search_beam_width", 100
+        )
+
     def process_batch(self, batch, metrics: MetricTracker):
         """
         Run batch through the model, compute metrics, compute loss,
@@ -102,34 +140,42 @@ class Trainer(BaseTrainer):
         audio_sample = audio[0]
         self.writer.add_audio("audio_sample", audio_sample, sample_rate=16000)
 
+    def _decode_predictions_for_logging(self, log_probs, log_probs_length):
+        if self.decoding_strategy == "beam_search":
+            pred = self.text_encoder.ctc_beam_search_decode(
+                probs=log_probs.cpu(),
+                probs_length=log_probs_length.cpu(),
+                beam_width=self.beam_search_beam_width,
+            )
+            return pred
+        elif self.decoding_strategy == "argmax":
+            pred, _ = self.text_encoder.ctc_argmax_decode(
+                log_probs.cpu(), log_probs_length.cpu()
+            )
+            return pred
+        else:
+            raise NotImplementedError()
+
     def log_predictions(
         self, text, log_probs, log_probs_length, audio_path, examples_to_log=10, **batch
     ):
-        # TODO add beam search
-        # Note: by improving text encoder and metrics design
-        # this logging can also be improved significantly
+        if self.writer is None:
+            return
 
-        argmax_inds = log_probs.cpu().argmax(-1).numpy()
-        argmax_inds = [
-            inds[: int(ind_len)]
-            for inds, ind_len in zip(argmax_inds, log_probs_length.numpy())
-        ]
-        argmax_texts_raw = [self.text_encoder.decode(inds) for inds in argmax_inds]
-        argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
-        tuples = list(zip(argmax_texts, text, argmax_texts_raw, audio_path))
+        pred = self._decode_predictions_for_logging(log_probs, log_probs_length)
 
+        tuples = list(zip(pred, text, audio_path))
         rows = {}
-        for pred, target, raw_pred, audio_path in tuples[:examples_to_log]:
+        for pred, target, audio_path in tuples[:examples_to_log]:
             target = self.text_encoder.normalize_text(target)
             wer = calc_wer(target, pred) * 100
             cer = calc_cer(target, pred) * 100
 
             rows[Path(audio_path).name] = {
                 "target": target,
-                "raw prediction": raw_pred,
-                "predictions": pred,
-                "wer": wer,
-                "cer": cer,
+                "prediction": pred,
+                "WER": f"{wer:.1f}",
+                "CER": f"{cer:.1f}",
             }
         self.writer.add_table(
             "predictions", pd.DataFrame.from_dict(rows, orient="index")

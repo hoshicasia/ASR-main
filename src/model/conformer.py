@@ -18,10 +18,10 @@ class Conformer(nn.Module):
         self,
         n_feats=128,
         n_tokens=28,
-        input_dim=128,
-        num_heads=8,
-        ffn_dim=512,
-        num_layers=12,
+        input_dim=144,
+        num_heads=4,
+        ffn_dim=576,
+        num_layers=16,
         depthwise_conv_kernel_size=31,
         dropout=0.1,
     ):
@@ -30,10 +30,25 @@ class Conformer(nn.Module):
         self.n_feats = n_feats
         self.input_dim = input_dim
 
-        if n_feats != input_dim:
-            self.input_projection = nn.Linear(n_feats, input_dim)
-        else:
-            self.input_projection = None
+        # Following the article's suggestion for subsampling
+        self.subsampling = nn.Sequential(
+            nn.Conv1d(
+                in_channels=n_feats,
+                out_channels=input_dim,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+            ),
+            nn.ReLU(),
+            nn.Conv1d(
+                in_channels=input_dim,
+                out_channels=input_dim,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+            ),
+            nn.ReLU(),
+        )
 
         self.conformer = TorchAudioConformer(
             input_dim=input_dim,
@@ -56,14 +71,13 @@ class Conformer(nn.Module):
                 - log_probs: log probabilities for CTC
                 - log_probs_length: output lengths
         """
-        spectrogram = spectrogram.transpose(1, 2)
-        if self.input_projection is not None:
-            x = self.input_projection(spectrogram)
-        else:
-            x = spectrogram
+        spectrogram_length = spectrogram_length.to(spectrogram.device)
+        x = self.subsampling(spectrogram)
+        x = x.permute(0, 2, 1).contiguous()
+        output_lengths = self.transform_input_lengths(spectrogram_length)
 
-        spectrogram_length = spectrogram_length.to(x.device)
-        output, output_lengths = self.conformer(x, spectrogram_length)
+        output, output_lengths = self.conformer(x, output_lengths)
+
         logits = self.output_projection(output)
         log_probs = F.log_softmax(logits, dim=-1)
 
@@ -73,4 +87,4 @@ class Conformer(nn.Module):
         """
         Input lengths stay the same.
         """
-        return input_lengths
+        return (input_lengths + 3) // 4

@@ -1,7 +1,7 @@
 defaults:
   - model: baseline
   - metrics: example
-  - datasets: custom_dir
+  - datasets: example
   - dataloader: custom_dir
   - transforms: example_only_instance
   - _self_
@@ -17,3 +17,5 @@ inferencer:
   from_pretrained: "saved/testing/model_best.pth"
   save_dir: "saved"
   run_name: "custom_dir_inference"
+  decode_method: "beam_search"  # "argmax" or "beam_search"
+  beam_width: 10

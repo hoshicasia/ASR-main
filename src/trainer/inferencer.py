@@ -103,6 +103,82 @@ class Inferencer(BaseTrainer):
             part_logs[part] = logs
         return part_logs
 
+    def _decode_predictions(self, log_probs, log_probs_length):
+        """
+        Decode log probabilities into text predictions using configured method.
+
+        Args:
+            log_probs (Tensor): Log probabilities of shape [batch_size, seq_len, vocab_size].
+            log_probs_length (Tensor): Length of each sequence in the batch.
+
+        Returns:
+            list[str]: Decoded text predictions for each sample in the batch.
+        """
+        decode_method = self.cfg_trainer.get("decode_method", "argmax")
+
+        if decode_method == "beam_search":
+            return self._decode_beam_search(log_probs, log_probs_length)
+        else:
+            return self._decode_argmax(log_probs, log_probs_length)
+
+    def _decode_argmax(self, log_probs, log_probs_length):
+        """
+        Decode using greedy argmax approach.
+
+        Args:
+            log_probs (Tensor): Log probabilities of shape [batch_size, seq_len, vocab_size].
+            log_probs_length (Tensor): Length of each sequence in the batch.
+
+        Returns:
+            list[str]: Decoded text predictions.
+        """
+        argmax_inds = log_probs.argmax(-1).numpy()
+        argmax_inds = [
+            inds[: int(ind_len)]
+            for inds, ind_len in zip(argmax_inds, log_probs_length.numpy())
+        ]
+        return [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
+
+    def _decode_beam_search(self, log_probs, log_probs_length):
+        """
+        Decode using CTC beam search.
+
+        Args:
+            log_probs (Tensor): Log probabilities of shape [batch_size, seq_len, vocab_size].
+            log_probs_length (Tensor): Length of each sequence in the batch.
+
+        Returns:
+            list[str]: Decoded text predictions.
+        """
+        beam_width = self.cfg_trainer.get("beam_width", 10)
+        predictions = []
+
+        for log_prob, length in zip(log_probs, log_probs_length):
+            log_prob_slice = log_prob[: int(length)]
+            pred_text = self.text_encoder.ctc_beam_search_decode(
+                log_prob_slice, beam_width=beam_width
+            )
+            predictions.append(pred_text)
+
+        return predictions
+
+    def _save_predictions(self, predictions, audio_paths, part):
+        """
+        Save predictions to text files.
+
+        Args:
+            predictions (list[str]): Text predictions to save.
+            audio_paths (list[str]): Corresponding audio file paths.
+            part (str): Dataset partition name (used for directory structure).
+        """
+        for prediction_text, audio_path in zip(predictions, audio_paths):
+            utterance_id = Path(audio_path).stem
+            output_file = self.save_path / part / f"{utterance_id}.txt"
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+
+            with output_file.open("w", encoding="utf-8") as f:
+                f.write(prediction_text)
+
     def process_batch(self, batch_idx, batch, metrics, part):
         """
         Run batch through the model, compute metrics, and
@@ -139,25 +215,12 @@ class Inferencer(BaseTrainer):
             log_probs = batch["log_probs"].cpu()
             log_probs_length = batch["log_probs_length"].cpu()
 
-            argmax_inds = log_probs.argmax(-1).numpy()
-            argmax_inds = [
-                inds[: int(ind_len)]
-                for inds, ind_len in zip(argmax_inds, log_probs_length.numpy())
-            ]
-
-            predictions = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
+            predictions = self._decode_predictions(log_probs, log_probs_length)
 
             batch_size = log_probs.shape[0]
             audio_paths = batch.get("audio_path", [None] * batch_size)
 
-            for i in range(batch_size):
-                prediction_text = predictions[i]
-                audio_path = audio_paths[i]
-                # now we match utterance id to audio file name if possible and save as txt
-                utterance_id = Path(audio_path).stem
-                output_file = self.save_path / part / f"{utterance_id}.txt"
-                with output_file.open("w", encoding="utf-8") as f:
-                    f.write(prediction_text)
+            self._save_predictions(predictions, audio_paths, part)
 
         return batch
 
