@@ -1,8 +1,9 @@
 defaults:
-  - model: baseline
-  - metrics: example
-  - datasets: example
-  - dataloader: custom_dir
+  - model: conformer
+  - writer: cometml
+  - metrics: inference
+  - datasets: inference
+  - dataloader: librispeech
   - transforms: example_only_instance
   - _self_
 
@@ -12,10 +13,10 @@ text_encoder:
 inferencer:
   device_tensors: ["spectrogram", "spectrogram_length", "text_encoded"]
   device: auto
-  save_path: "custom_dir_predictions"
+  save_path: "librispeech_predictions"
   seed: 1
   from_pretrained: "saved/testing/model_best.pth"
   save_dir: "saved"
-  run_name: "custom_dir_inference"
-  decode_method: "beam_search"  # "argmax" or "beam_search"
+  run_name: "librispeech_inference"
+  decode_method: "argmax"  # "argmax" or "beam_search"
   beam_width: 10

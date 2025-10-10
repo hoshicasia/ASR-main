@@ -40,12 +40,17 @@ class BeamSearchWERMetric(BaseMetric):
     ):
         wers = []
         log_probs_cpu = log_probs.cpu()
-        lengths = log_probs_length.detach().cpu().numpy()
-        for log_prob_vec, length, target_text in zip(log_probs_cpu, lengths, text):
+        lengths = log_probs_length.detach().cpu()
+        for log_prob_vec, length_tensor, target_text in zip(
+            log_probs_cpu, lengths, text
+        ):
             target_text = self.text_encoder.normalize_text(target_text)
+            length = int(length_tensor.item())
             log_prob_slice = log_prob_vec[:length]
             pred_text = self.text_encoder.ctc_beam_search_decode(
-                log_prob_slice, beam_width=self.beam_width
-            )
+                probs=log_prob_slice.unsqueeze(0),
+                probs_length=length_tensor.unsqueeze(0),
+                beam_width=self.beam_width,
+            )[0]
             wers.append(calc_wer(target_text, pred_text))
         return sum(wers) / len(wers)
