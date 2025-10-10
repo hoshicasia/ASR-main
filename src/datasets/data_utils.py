@@ -67,10 +67,16 @@ def get_dataloaders(config, text_encoder, device):
     # dataloaders init
     dataloaders = {}
     for dataset_partition in config.datasets.keys():
-        # dataset partition init
-        dataset = instantiate(
-            config.datasets[dataset_partition], text_encoder=text_encoder
-        )  # instance transforms are defined inside
+        dataset_config = config.datasets[dataset_partition]
+
+        if dataset_config.get("_target_") == "torch.utils.data.ConcatDataset":
+            child_datasets = [
+                instantiate(child_config, text_encoder=text_encoder)
+                for child_config in dataset_config.datasets
+            ]
+            dataset = instantiate(dataset_config, datasets=child_datasets)
+        else:
+            dataset = instantiate(dataset_config, text_encoder=text_encoder)
 
         assert config.dataloader.batch_size <= len(dataset), (
             f"The batch size ({config.dataloader.batch_size}) cannot "
