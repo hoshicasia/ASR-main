@@ -60,6 +60,8 @@ class Conformer(nn.Module):
         )
 
         self.output_projection = nn.Linear(input_dim, n_tokens)
+        nn.init.normal_(self.output_projection.weight, mean=0.0, std=0.05)
+        nn.init.zeros_(self.output_projection.bias)
 
     def forward(self, spectrogram, spectrogram_length, **batch):
         """

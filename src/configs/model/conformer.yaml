@@ -1,12 +1,12 @@
 _target_: src.model.Conformer
-n_feats: 128
+n_feats: 80
 n_tokens: 28
 input_dim: 144
 num_heads: 4
 ffn_dim: 576
-num_layers: 16
+num_layers: 8  # Reduced from 16 for more stable training
 depthwise_conv_kernel_size: 31
-dropout: 0.1
+dropout: 0.1  # Reduced from 0.2 for better gradient flow
 
 
 #Conformer (M)

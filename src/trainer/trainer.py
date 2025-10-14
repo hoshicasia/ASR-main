@@ -1,10 +1,13 @@
 from pathlib import Path
 
 import pandas as pd
+import torch
+from torch.utils.data import DataLoader
 
 from src.logger.utils import plot_spectrogram
 from src.metrics.tracker import MetricTracker
 from src.metrics.utils import calc_cer, calc_wer
+from src.text_encoder import CTCTextEncoder
 from src.trainer.base_trainer import BaseTrainer
 
 
@@ -47,9 +50,7 @@ class Trainer(BaseTrainer):
             batch_transforms,
         )
         self.decoding_strategy = self.cfg_trainer.get("decoding_strategy", "argmax")
-        self.beam_search_beam_width = self.cfg_trainer.get(
-            "beam_search_beam_width", 100
-        )
+        self.beam_search_beam_width = self.cfg_trainer.get("beam_search_beam_width", 10)
 
     def process_batch(self, batch, metrics: MetricTracker):
         """

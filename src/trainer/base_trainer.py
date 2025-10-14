@@ -231,9 +231,15 @@ class BaseTrainer:
                         epoch, self._progress(batch_idx), batch["loss"].item()
                     )
                 )
-                self.writer.add_scalar(
-                    "learning rate", self.lr_scheduler.get_last_lr()[0]
-                )
+                try:
+                    if self.lr_scheduler is not None:
+                        lr = self.lr_scheduler.get_last_lr()[0]
+                    else:
+                        lr = self.optimizer.param_groups[0]["lr"]
+                except Exception:
+                    lr = self.optimizer.param_groups[0]["lr"]
+
+                self.writer.add_scalar("learning rate", lr)
                 self._log_scalars(self.train_metrics)
                 self._log_batch(batch_idx, batch)
                 # we don't want to reset train metrics at the start of every epoch
@@ -466,12 +472,19 @@ class BaseTrainer:
                 checkpoint-epochEpochNumber.pth)
         """
         arch = type(self.model).__name__
+        optimizer_state = (
+            self.optimizer.state_dict() if self.optimizer is not None else None
+        )
+        lr_scheduler_state = (
+            self.lr_scheduler.state_dict() if self.lr_scheduler is not None else None
+        )
+
         state = {
             "arch": arch,
             "epoch": epoch,
             "state_dict": self.model.state_dict(),
-            "optimizer": self.optimizer.state_dict(),
-            "lr_scheduler": self.lr_scheduler.state_dict(),
+            "optimizer": optimizer_state,
+            "lr_scheduler": lr_scheduler_state,
             "monitor_best": self.mnt_best,
             "config": self.config,
         }
@@ -515,18 +528,41 @@ class BaseTrainer:
         self.model.load_state_dict(checkpoint["state_dict"])
 
         # load optimizer state from checkpoint only when optimizer type is not changed.
-        if (
-            checkpoint["config"]["optimizer"] != self.config["optimizer"]
-            or checkpoint["config"]["lr_scheduler"] != self.config["lr_scheduler"]
-        ):
+        checkpoint_optimizer_cfg = checkpoint["config"].get("optimizer")
+        checkpoint_scheduler_cfg = checkpoint["config"].get("lr_scheduler")
+
+        if checkpoint_optimizer_cfg != self.config.get(
+            "optimizer"
+        ) or checkpoint_scheduler_cfg != self.config.get("lr_scheduler"):
             self.logger.warning(
                 "Warning: Optimizer or lr_scheduler given in the config file is different "
                 "from that of the checkpoint. Optimizer and scheduler parameters "
                 "are not resumed."
             )
         else:
-            self.optimizer.load_state_dict(checkpoint["optimizer"])
-            self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+            optimizer_state = checkpoint.get("optimizer")
+            if self.optimizer is not None and optimizer_state is not None:
+                self.optimizer.load_state_dict(optimizer_state)
+            elif optimizer_state is None:
+                self.logger.info(
+                    "Checkpoint does not contain optimizer state. Skipping optimizer restore."
+                )
+            else:
+                self.logger.warning(
+                    "Optimizer instance is None while checkpoint contains optimizer state."
+                )
+
+            lr_scheduler_state = checkpoint.get("lr_scheduler")
+            if self.lr_scheduler is not None and lr_scheduler_state is not None:
+                self.lr_scheduler.load_state_dict(lr_scheduler_state)
+            elif lr_scheduler_state is None:
+                self.logger.info(
+                    "Checkpoint does not contain lr_scheduler state. Skipping scheduler restore."
+                )
+            else:
+                self.logger.warning(
+                    "LR scheduler instance is None while checkpoint contains scheduler state."
+                )
 
         self.logger.info(
             f"Checkpoint loaded. Resume training from epoch {self.start_epoch}"
