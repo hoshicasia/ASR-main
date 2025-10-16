@@ -1,16 +1,21 @@
 # Automatic Speech Recognition with Confomer-CTC
 
-<p align="center">
-  <a href="#about">About</a> •
-  <a href="#installation">Installation</a> •
-  <a href="#how-to-use">How To Use</a> •
-  <a href="#credits">Credits</a> •
-  <a href="#license">License</a>
-</p>
+## Table of Contents
+
+- [About](#about)
+- [Installation](#installation)
+- [Inference](#inference)
+- [Training](#training)
+- [Demo](#demo)
+- [Notes](#notes)
+- [Useful Links](#useful)
+- [Credits](#credits)
+- [License](#license)
+
 
 ## About
 
-This repository contains an implementation of **Automatic Speech Recognition (ASR)** using slightly modified [**Conformer*](https://arxiv.org/abs/2005.08100) architecture trained on the [**LibriSpeech**](https://www.openslr.org/12) dataset.
+This repository contains an implementation of **Automatic Speech Recognition (ASR)** using slightly modified [*Conformer*](https://arxiv.org/abs/2005.08100) architecture trained on the [**LibriSpeech**](https://www.openslr.org/12) dataset.
 The model was evaluated on the standard LibriSpeech test sets. Below are the final metrics:
 
 | Dataset       | WER   |  CER   |
@@ -101,7 +106,7 @@ python train.py -cn=finetune_bpe text_encoder.model_path=data/bpe_model.model tr
 
 ## Notes
 
-Logging is disabled by default (writer=none). To enable CometML, set up your API key.
+This project uses CometML for logging, to use it set up your API key or choose writer=none option.
 
 ## Useful links
 
@@ -110,3 +115,13 @@ Logging is disabled by default (writer=none). To enable CometML, set up your API
 3. [Hydra Documentation](https://hydra.cc/docs/intro/) — configuration framework used in this project
 4. [SentencePiece (BPE)](https://github.com/google/sentencepiece) — subword tokenizer used for BPE model
 5. [PyTorch](https://pytorch.org/) — DL framework used in the project
+6. [CometML](https://www.comet.com/site/) - platform for logging used in the project.
+
+
+## Credits
+
+This repository is based on a [PyTorch Project Template](https://github.com/Blinorot/pytorch_project_template).
+
+## License
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](/LICENSE)
