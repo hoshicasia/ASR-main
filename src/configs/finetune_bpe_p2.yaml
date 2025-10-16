@@ -4,7 +4,7 @@ defaults:
   - metrics: universal
   - datasets: finetune
   - dataloader: librispeech
-  - transforms: finetune_augs
+  - transforms: finetune_augs_p2
   - _self_
 
 optimizer:

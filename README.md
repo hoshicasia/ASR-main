@@ -15,7 +15,7 @@
 
 ## About
 
-This repository contains an implementation of **Automatic Speech Recognition (ASR)** using slightly modified [*Conformer*](https://arxiv.org/abs/2005.08100) architecture trained on the [**LibriSpeech**](https://www.openslr.org/12) dataset.
+This repository contains an implementation of **Automatic Speech Recognition (ASR)** using slightly modified [**Conformer**](https://arxiv.org/abs/2005.08100) architecture trained on the [**LibriSpeech**](https://www.openslr.org/12) dataset.
 The model was evaluated on the standard LibriSpeech test sets. Below are the final metrics:
 
 | Dataset       | WER   |  CER   |

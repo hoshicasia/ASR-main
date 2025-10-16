@@ -75,9 +75,17 @@ def main(config):
     # setup writer for logging (optional)
     writer = None
     if config.get("writer") is not None and config.inferencer.get("log_results", False):
-        writer = instantiate(config.writer)
-        if writer is not None:
-            logger.info("Writer initialized for logging inference results")
+        if config.get("writer") == {}:
+            writer = DummyWriter()
+        else:
+            writer = CometMLWriter(
+                logger=logger,
+                project_config=config,
+                project_name=config.writer.get("project_name", "asr_inference"),
+                workspace=config.writer.get("workspace", None),
+                run_name=config.writer.get("run_name", "inference"),
+                mode=config.writer.get("mode", "online"),
+            )
 
     inferencer = Inferencer(
         model=model,
