@@ -1,3 +1,4 @@
+_target_: src.logger.cometml.CometMLWriter
 project_name: "pytorch_template_asr_example"
 workspace: null
 run_name: "testing"
