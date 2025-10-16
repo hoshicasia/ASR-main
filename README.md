@@ -30,7 +30,7 @@ The model was evaluated on the standard LibriSpeech test sets. Below are the fin
 Clone the repository and install required dependencies:
 
 ```bash
-git clone https://github.com/hoshicasia/ASR.git
+git clone https://github.com/hoshicasia/ASR-main.git
 cd ASR-main
 pip install -r requirements.txt
 ```
