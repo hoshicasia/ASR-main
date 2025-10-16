@@ -1,18 +1,27 @@
+import argparse
+import os
 import sys
 from pathlib import Path
 
 from src.metrics.universal_metrics import UniversalCERMetric, UniversalWERMetric
 from src.text_encoder.ctc_text_encoder import CTCTextEncoder
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 
 def read_text_file(path):
-    with open(path, encoding="utf-8") as f:
+    with open(path) as f:
         return f.read().replace("\n", " ").strip()
 
 
-def main(pred_dir: str, target_dir: str):
-    pred_path = Path(pred_dir)
-    target_path = Path(target_dir)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pred_dir", type=str, required=True)
+    parser.add_argument("--target_dir", type=str, required=True)
+    args = parser.parse_args()
+
+    pred_path = Path(args.pred_dir).resolve()
+    target_path = Path(args.target_dir).resolve()
 
     predictions = []
     ground_truths = []
@@ -21,7 +30,6 @@ def main(pred_dir: str, target_dir: str):
         target_file = target_path / pred_file.name
         pred_text = read_text_file(pred_file)
         target_text = read_text_file(target_file)
-
         predictions.append(pred_text)
         ground_truths.append(target_text)
 
@@ -32,9 +40,9 @@ def main(pred_dir: str, target_dir: str):
     wer = wer_metric(ground_truths, predictions)
     cer = cer_metric(ground_truths, predictions)
 
-    print(f"WER: {wer * 100:.2f}%")
-    print(f"CER: {cer * 100:.2f}%")
+    print(f"WER: {wer}")
+    print(f"CER: {cer}")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main()

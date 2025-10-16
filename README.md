@@ -10,75 +10,103 @@
 
 ## About
 
-This repository contains an implementation of **Automatic Speech Recognition (ASR)** using the **Conformer** architecture trained on the **LibriSpeech** dataset.
+This repository contains an implementation of **Automatic Speech Recognition (ASR)** using slightly modified [**Conformer*](https://arxiv.org/abs/2005.08100) architecture trained on the [**LibriSpeech**](https://www.openslr.org/12) dataset.
 The model was evaluated on the standard LibriSpeech test sets. Below are the final metrics:
 
 | Dataset       | WER   |  CER   |
 |---------------|-------|--------|
-| `test-clean`  |       |        |
-| `test-other`  |       |        |
+| `test-clean`  |  26.9 |  10.7  |
+| `test-other`  |  52.8 |  26.7  |
+
 
 
 ## Installation
 
-Follow these steps to install the project:
-
-0. (Optional) Create and activate new environment using [`conda`](https://conda.io/projects/conda/en/latest/user-guide/getting-started.html) or `venv` ([`+pyenv`](https://github.com/pyenv/pyenv)).
-
-   a. `conda` version:
-
-   ```bash
-   # create env
-   conda create -n project_env python=PYTHON_VERSION
-
-   # activate env
-   conda activate project_env
-   ```
-
-   b. `venv` (`+pyenv`) version:
-
-   ```bash
-   # create env
-   ~/.pyenv/versions/PYTHON_VERSION/bin/python3 -m venv project_env
-
-   # alternatively, using default python version
-   python3 -m venv project_env
-
-   # activate env
-   source project_env/bin/activate
-   ```
-
-1. Install all required packages
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. Install `pre-commit`:
-   ```bash
-   pre-commit install
-   ```
-
-## How To Use
-
-To train a model, run the following command:
+Clone the repository and install required dependencies:
 
 ```bash
-python3 train.py -cn=CONFIG_NAME HYDRA_CONFIG_ARGUMENTS
+git clone https://github.com/hoshicasia/ASR.git
+cd ASR-main
+pip install -r requirements.txt
 ```
 
-Where `CONFIG_NAME` is a config from `src/configs` and `HYDRA_CONFIG_ARGUMENTS` are optional arguments.
-
-To run inference (evaluate the model or save predictions):
+Download pretrained checkpoints:
 
 ```bash
-python3 inference.py HYDRA_CONFIG_ARGUMENTS
+chmod +x download_checkpoints.sh
+./download_checkpoints.sh
 ```
 
-## Credits
+## Inference
+To run inference on the LibriSpeech test dataset:
 
-This repository is based on a [PyTorch Project Template](https://github.com/Blinorot/pytorch_project_template).
+```bash
+python inference.py -cn=inference_bpe writer=none text_encoder.model_path=data/bpe_model.model inferencer.from_pretrained=data/best_model/
+```
 
-## License
+You can also use your own dataset in the following format:
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](/LICENSE)
+```arduino
+NameOfTheDirectoryWithUtterances/
+├── audio/
+│   ├── UtteranceID1.wav      # may also be .flac or .mp3
+│   ├── UtteranceID2.wav
+│   └── ...
+└── transcriptions/           # ground truth, optional
+    ├── UtteranceID1.txt
+    ├── UtteranceID2.txt
+    └── ...
+```
+
+Run inference on your custom dataset:
+
+```bash
+python inference.py -cn=inference_bpe datasets=custom_dir \
+    inferencer.save_dir=inference_results \
+    datasets.val.data_dir=test_data/
+```
+
+If you already have ground truth and prediction files, you can evaluate them directly with the following metrics script:
+
+```bash
+python scripts/calc_metrics.py --pred_dir=your/predictions/dir --target_dir=your/ground_truth/dir
+```
+## Training
+
+If you wish to replicate training process, follow this steps:
+
+0. (Optional) By default this project uses BPE model with vocabulary size 300 trained on librispeech-clean text corpus.
+   If you want to train your own BPE model, run the following:
+
+
+```bash
+python train_bpe.py --input your_text_corpus.txt --vocab-size VOCAB_SIZE --output bpe_model
+```
+
+1. Baseline training
+
+```bash
+python train.py -cn=baseline_bpe text_encoder.model_path=data/bpe_model.model writer=null
+```
+
+2. Fine-tuning
+
+```bash
+python train.py -cn=finetune_bpe text_encoder.model_path=data/bpe_model.model trainer.resume_from=path/to/last/model/checkpoint
+```
+
+## Demo
+
+ The Installation and Inference steps described above are demonstrated in the ASR-Project-Demo.ipynb notebook included in this repository.
+
+## Notes
+
+Logging is disabled by default (writer=none). To enable CometML, set up your API key.
+
+## Useful links
+
+1. [Conformer](https://arxiv.org/abs/2005.08100) - article with the architecture that was used in the project
+2. [LibriSpeech dataset](https://www.openslr.org/12) - dataset that was used for training and evaluation
+3. [Hydra Documentation](https://hydra.cc/docs/intro/) — configuration framework used in this project
+4. [SentencePiece (BPE)](https://github.com/google/sentencepiece) — subword tokenizer used for BPE model
+5. [PyTorch](https://pytorch.org/) — DL framework used in the project

@@ -1,5 +1,5 @@
 defaults:
-  - instance_transforms: all_augs
+  - instance_transforms:  base_augs
   - _self_
 
 # these lines are required if you do not use batch transforms

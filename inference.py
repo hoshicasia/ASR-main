@@ -10,6 +10,7 @@ from omegaconf import OmegaConf
 
 from src.datasets.data_utils import get_dataloaders
 from src.logger import CometMLWriter
+from src.logger.dummy import DummyWriter
 from src.logger.logger import setup_logging
 from src.metrics.utils import calc_cer, calc_wer
 from src.trainer import Inferencer
@@ -74,16 +75,9 @@ def main(config):
     # setup writer for logging (optional)
     writer = None
     if config.get("writer") is not None and config.inferencer.get("log_results", False):
-        # Manually create writer with required arguments
-        writer = CometMLWriter(
-            logger=logger,
-            project_config=config,
-            project_name=config.writer.get("project_name", "asr_inference"),
-            workspace=config.writer.get("workspace", None),
-            run_name=config.writer.get("run_name", "inference"),
-            mode=config.writer.get("mode", "online"),
-        )
-        logger.info("Writer initialized for logging inference results")
+        writer = instantiate(config.writer)
+        if writer is not None:
+            logger.info("Writer initialized for logging inference results")
 
     inferencer = Inferencer(
         model=model,

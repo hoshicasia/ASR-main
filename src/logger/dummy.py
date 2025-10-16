@@ -20,6 +20,9 @@ class DummyWriter:
     def flush(self):
         pass
 
+    def add_scalars(self, scalars, step=None):
+        pass
+
     def __getattr__(self, name):
         def dummy(*args, **kwargs):
             pass

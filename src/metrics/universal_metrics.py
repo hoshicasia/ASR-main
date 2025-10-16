@@ -31,7 +31,7 @@ class UniversalWERMetric(BaseMetric):
         for pred_text, target_text in zip(predictions, text):
             target_text = self.text_encoder.normalize_text(target_text)
             wers.append(calc_wer(target_text, pred_text))
-        return sum(wers) / len(wers)
+        return sum(wers) / len(wers) if len(wers) > 0 else 1.0
 
 
 class UniversalCERMetric(BaseMetric):
@@ -61,4 +61,4 @@ class UniversalCERMetric(BaseMetric):
         for pred_text, target_text in zip(predictions, text):
             target_text = self.text_encoder.normalize_text(target_text)
             cers.append(calc_cer(target_text, pred_text))
-        return sum(cers) / len(cers)
+        return sum(cers) / len(cers) if len(cers) > 0 else 1.0

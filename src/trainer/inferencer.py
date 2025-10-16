@@ -220,19 +220,6 @@ class Inferencer(BaseTrainer):
             out.append(decoded)
         return out
 
-    def _decode_beam_search_lm(
-        self,
-        log_probs,
-        log_probs_length,
-        beam_width=1500,
-        alpha=3.23,
-        beta=-0.26,
-        kenlm_files_name="librispeech-4-gram",
-    ):
-        """
-        Decode using beam search with language model.
-        """
-
     def _save_predictions(self, predictions, audio_paths, part):
         """
         Save predictions to text files.

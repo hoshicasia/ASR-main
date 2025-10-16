@@ -1,5 +1,5 @@
 defaults:
-  - model: conformer_L_bpe
+  - model: conformer_M_bpe
   - writer: cometml
   - metrics: universal
   - datasets: baseline
@@ -37,10 +37,10 @@ trainer:
   device: auto # device name or "auto"
   override: True # if True, will override the previous run with the same name
   monitor: "min val_WER" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
-  save_period: 5 # checkpoint each save_period epochs in addition to the best epoch
+  save_period: 10 # checkpoint each save_period epochs in addition to the best epoch
   early_stop: ${trainer.n_epochs} # epochs for early stopping
   save_dir: "saved"
   seed: 1
   decoding_strategy: "argmax" # "argmax", "beam_search", or "beam_search_lm"
   beam_search_beam_width: 10
-  max_grad_norm: 50.0
+  max_grad_norm: 10.0
