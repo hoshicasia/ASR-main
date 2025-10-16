@@ -3,10 +3,15 @@ import os
 import sys
 from pathlib import Path
 
-from src.metrics.universal_metrics import UniversalCERMetric, UniversalWERMetric
-from src.text_encoder.ctc_text_encoder import CTCTextEncoder
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+)  # noqa: E402
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from src.metrics.universal_metrics import (  # noqa: E402
+    UniversalCERMetric,
+    UniversalWERMetric,
+)
+from src.text_encoder.ctc_text_encoder import CTCTextEncoder  # noqa: E402
 
 
 def read_text_file(path):
