@@ -60,15 +60,13 @@ def get_dataloaders(config, text_encoder, device):
             should be applied on the whole batch. Depend on the
             tensor name.
     """
-    # transforms or augmentations init
     batch_transforms = instantiate(config.transforms.batch_transforms)
     move_batch_transforms_to_device(batch_transforms, device)
 
-    # dataloaders init
     dataloaders = {}
     for dataset_partition in config.datasets.keys():
         dataset_config = config.datasets[dataset_partition]
-
+        # Adapt for concat datasets
         if dataset_config.get("_target_") == "torch.utils.data.ConcatDataset":
             child_datasets = [
                 instantiate(child_config, text_encoder=text_encoder)

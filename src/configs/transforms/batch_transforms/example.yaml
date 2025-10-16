@@ -1,13 +1,14 @@
 train:
-  data_object: # name of the tensor on which we apply transform
-    _target_: torch.nn.Sequential # to apply several transforms sequentially
+  spectrogram:
+    _target_: torch.nn.Sequential
     _args_:
-      - _target_: src.transforms.Normalize1D
-        mean: 0.5
-        std: 0.5
+      - _target_: src.transforms.spec_augs.spec_augment.SpecAugment
+        freq_mask_param: 40
+        time_mask_param: 15
+        p: 0.9
 inference:
-  data_object: # name of the tensor on which we apply transform
-    _target_: torch.nn.Sequential # to apply several transforms sequentially
+  data_object:
+    _target_: torch.nn.Sequential
     _args_:
       - _target_: src.transforms.Normalize1D
         mean: 0.5

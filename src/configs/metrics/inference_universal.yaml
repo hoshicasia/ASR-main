@@ -1,0 +1,7 @@
+inference: # metrics that are calculated during inference (eval)
+  # Universal metrics use the decode_method specified in inferencer config
+  # So they will use beam_search_lm, beam_search, or argmax depending on your setting
+  - _target_: src.metrics.UniversalCERMetric
+    name: "CER" # it is better to avoid spaces in names
+  - _target_: src.metrics.UniversalWERMetric
+    name: "WER"

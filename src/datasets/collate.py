@@ -16,13 +16,12 @@ def collate_fn(dataset_items: list[dict]):
     """
 
     batch_size = len(dataset_items)
-
     audios = [item["audio"] for item in dataset_items]
-    audio_lengths = torch.tensor([a.shape[-1] for a in audios], dtype=torch.long)
-    max_audio_len = int(audio_lengths.max().item())
-    audio_channels = audios[0].shape[0]
+    audio_lengths = torch.tensor([a.shape[-1] for a in audios])
 
-    audio_batch = audios[0].new_zeros((batch_size, audio_channels, max_audio_len))
+    audio_batch = audios[0].new_zeros(
+        (batch_size, audios[0].shape[0], int(audio_lengths.max().item()))
+    )
     for i, a in enumerate(audios):
         audio_batch[i, :, : a.shape[-1]] = a
 
@@ -33,7 +32,7 @@ def collate_fn(dataset_items: list[dict]):
             s = s.squeeze(0)
         specs.append(s)
 
-    spec_lengths = torch.tensor([s.shape[-1] for s in specs], dtype=torch.long)
+    spec_lengths = torch.tensor([s.shape[-1] for s in specs])
     max_spec_len = int(spec_lengths.max().item())
     n_mels = specs[0].shape[0]
 
@@ -42,9 +41,7 @@ def collate_fn(dataset_items: list[dict]):
         spec_batch[i, :, : s.shape[-1]] = s
 
     encoded_seqs = [item["text_encoded"].view(-1).long() for item in dataset_items]
-    encoded_lengths = torch.tensor(
-        [seq.size(0) for seq in encoded_seqs], dtype=torch.long
-    )
+    encoded_lengths = torch.tensor([seq.size(0) for seq in encoded_seqs])
 
     padded_texts = pad_sequence(encoded_seqs, batch_first=True, padding_value=0)
     texts = [item["text"] for item in dataset_items]

@@ -24,12 +24,13 @@ class Conformer(nn.Module):
         num_layers=16,
         depthwise_conv_kernel_size=31,
         dropout=0.1,
+        freeze_layers=0,
     ):
         super().__init__()
 
         self.n_feats = n_feats
         self.input_dim = input_dim
-
+        self.freeze_layers = freeze_layers
         # Following the article's suggestion for subsampling
         self.subsampling = nn.Sequential(
             nn.Conv1d(
@@ -63,6 +64,16 @@ class Conformer(nn.Module):
         nn.init.normal_(self.output_projection.weight, mean=0.0, std=0.05)
         nn.init.zeros_(self.output_projection.bias)
 
+        self._freeze_encoder_layers()
+
+    def _freeze_encoder_layers(self):
+        """Freeze first N Conformer encoder layers"""
+        if self.freeze_layers > 0:
+            encoder_layers = list(self.conformer.conformer_layers)
+            for layer in encoder_layers[: self.freeze_layers]:
+                for param in layer.parameters():
+                    param.requires_grad = False
+
     def forward(self, spectrogram, spectrogram_length, **batch):
         """
         Args:
@@ -87,6 +98,8 @@ class Conformer(nn.Module):
 
     def transform_input_lengths(self, input_lengths):
         """
-        Input lengths stay the same.
+        Transform input lengths to output lengths after subsampling.
+        #This is only true for the 2-layer subsampling with stride 2 in each layer. If you wish to change the subsampling, change this method accordingly.
+        #If you don't have subsampling, you can just return input_lengths or use torch implementation.
         """
         return (input_lengths + 3) // 4

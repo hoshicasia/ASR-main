@@ -1,0 +1,10 @@
+#Conformer (L)
+_target_: src.model.Conformer
+n_feats: 80
+n_tokens: 301
+input_dim: 512
+num_heads: 8
+ffn_dim: 2048
+num_layers: 17
+depthwise_conv_kernel_size: 31
+dropout: 0.2

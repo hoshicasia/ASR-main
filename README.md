@@ -1,4 +1,4 @@
-# Automatic Speech Recognition (ASR) with PyTorch
+# Automatic Speech Recognition with Confomer-CTC
 
 <p align="center">
   <a href="#about">About</a> •
@@ -10,9 +10,14 @@
 
 ## About
 
-This repository contains a template for solving ASR task with PyTorch. This template branch is a part of the [HSE DLA course](https://github.com/markovka17/dla) ASR homework. Some parts of the code are missing (or do not follow the most optimal design choices...) and students are required to fill these parts themselves (as well as writing their own models, etc.).
+This repository contains an implementation of **Automatic Speech Recognition (ASR)** using the **Conformer** architecture trained on the **LibriSpeech** dataset.
+The model was evaluated on the standard LibriSpeech test sets. Below are the final metrics:
 
-See the task assignment [here](https://github.com/markovka17/dla/tree/2024/hw1_asr).
+| Dataset       | WER   |  CER   |
+|---------------|-------|--------|
+| `test-clean`  |       |        |
+| `test-other`  |       |        |
+
 
 ## Installation
 

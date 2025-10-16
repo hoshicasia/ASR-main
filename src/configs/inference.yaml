@@ -1,14 +1,14 @@
 defaults:
-  - model: conformer
+  - model: conformer_S
   - writer: cometml
-  - metrics: inference
+  - metrics: inference_universal
   - datasets: inference
   - dataloader: librispeech
-  - transforms: example_only_instance
+  - transforms: base_augs
   - _self_
 
 text_encoder:
-  _target_: src.text_encoder.CTCTextEncoder
+   _target_: src.text_encoder.CTCTextEncoder
 
 inferencer:
   device_tensors: ["spectrogram", "spectrogram_length", "text_encoded"]
@@ -18,5 +18,7 @@ inferencer:
   from_pretrained: "saved/testing/model_best.pth"
   save_dir: "saved"
   run_name: "librispeech_inference"
-  decode_method: "argmax"  # "argmax" or "beam_search"
+  decode_method: "argmax"  # "argmax", "beam_search", or "beam_search_lm"
   beam_width: 10
+  log_results: true
+  examples_to_log: 20

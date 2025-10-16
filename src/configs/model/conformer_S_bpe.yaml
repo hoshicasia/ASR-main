@@ -1,0 +1,9 @@
+_target_: src.model.Conformer
+n_feats: 80
+n_tokens: 301
+input_dim: 144
+num_heads: 4
+ffn_dim: 576
+num_layers: 8  #less than in an article
+depthwise_conv_kernel_size: 31
+dropout: 0.1

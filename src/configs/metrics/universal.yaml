@@ -1,0 +1,8 @@
+
+train: []
+
+inference:
+  - _target_: src.metrics.UniversalCERMetric
+    name: "CER"
+  - _target_: src.metrics.UniversalWERMetric
+    name: "WER"

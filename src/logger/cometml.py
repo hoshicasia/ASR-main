@@ -45,7 +45,16 @@ class CometMLWriter:
             self.run_id = run_id
 
             resume = False
-            if project_config["trainer"].get("resume_from") is not None:
+            # Check for resume in both trainer and inferencer configs
+            if (
+                project_config.get("trainer") is not None
+                and project_config["trainer"].get("resume_from") is not None
+            ):
+                resume = True
+            elif (
+                project_config.get("inferencer") is not None
+                and project_config["inferencer"].get("resume_from") is not None
+            ):
                 resume = True
 
             if resume:

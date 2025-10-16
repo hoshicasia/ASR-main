@@ -12,6 +12,10 @@ hydra-core
 torchmetrics
 datasets==2.15.0
 torchcodec==0.1.0
+pyctcdecode
+pypi-kenlm
+sentencepiece
+transformers
 
 wget
 black

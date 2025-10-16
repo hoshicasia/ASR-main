@@ -27,6 +27,7 @@ class Inferencer(BaseTrainer):
         metrics=None,
         batch_transforms=None,
         logger=None,
+        writer=None,
         skip_model_load=False,
     ):
         """
@@ -48,6 +49,8 @@ class Inferencer(BaseTrainer):
                 should be applied on the whole batch. Depend on the
                 tensor name.
             logger (Logger | None): logger for logging inference progress.
+            writer (Writer | None): experiment tracker writer for logging
+                predictions, metrics, and other artifacts.
             skip_model_load (bool): if False, require the user to set
                 pre-trained checkpoint path. Set this argument to True if
                 the model desirable weights are defined outside of the
@@ -67,6 +70,7 @@ class Inferencer(BaseTrainer):
 
         self.text_encoder = text_encoder
         self.logger = logger
+        self.writer = writer
 
         # define dataloaders
         self.evaluation_dataloaders = {k: v for k, v in dataloaders.items()}
@@ -80,7 +84,7 @@ class Inferencer(BaseTrainer):
         if self.metrics is not None:
             self.evaluation_metrics = MetricTracker(
                 *[m.name for m in self.metrics["inference"]],
-                writer=None,
+                writer=writer,
             )
         else:
             self.evaluation_metrics = None
@@ -118,6 +122,14 @@ class Inferencer(BaseTrainer):
 
         if decode_method == "beam_search":
             return self._decode_beam_search(log_probs, log_probs_length)
+        elif decode_method == "beam_search_lm":
+            return self._decode_beam_search_lm(
+                log_probs,
+                log_probs_length,
+                beam_width=self.cfg_trainer.get("beam_width", 50),
+                alpha=self.cfg_trainer.get("lm_alpha", 0.5),
+                beta=self.cfg_trainer.get("lm_beta", 0.0),
+            )
         else:
             return self._decode_argmax(log_probs, log_probs_length)
 
@@ -139,28 +151,87 @@ class Inferencer(BaseTrainer):
         ]
         return [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
 
-    def _decode_beam_search(self, log_probs, log_probs_length):
+    def _decode_beam_search(self, log_probs, log_probs_length, beam_width=None):
         """
-        Decode using CTC beam search.
-
+        CTC Beam Search
         Args:
             log_probs (Tensor): Log probabilities of shape [batch_size, seq_len, vocab_size].
             log_probs_length (Tensor): Length of each sequence in the batch.
-
+            beam_width (int | None): Beam width for the search. If None, uses default from config.
         Returns:
             list[str]: Decoded text predictions.
         """
-        beam_width = self.cfg_trainer.get("beam_width", 10)
-        predictions = []
+        import numpy as np
 
-        for log_prob, length in zip(log_probs, log_probs_length):
-            log_prob_slice = log_prob[: int(length)]
-            pred_text = self.text_encoder.ctc_beam_search_decode(
-                log_prob_slice, beam_width=beam_width
-            )
-            predictions.append(pred_text)
+        if beam_width is None:
+            beam_width = int(self.cfg_trainer.get("beam_width", 10))
+        lp = log_probs.detach().cpu().numpy()
+        lens = log_probs_length.detach().cpu().numpy().astype(int)
 
-        return predictions
+        blank = 0
+        B = lp.shape[0]
+        out = []
+
+        for b in range(B):
+            T = int(lens[b])
+            if T == 0:
+                out.append("")
+                continue
+
+            probs = lp[b, :T, :]
+            V = probs.shape[1]
+            beams = {(): (0.0, -np.inf)}
+
+            for t in range(T):
+                lpt = probs[t]
+                next_beams = {}
+                topk = np.argsort(-lpt)[: min(V, beam_width + 5)]
+
+                for pref, (pb, pnb) in beams.items():
+                    total = np.logaddexp(pb, pnb)
+
+                    nb_pb = total + float(lpt[blank])
+                    prev = next_beams.get(pref, (-np.inf, -np.inf))
+                    next_beams[pref] = (np.logaddexp(prev[0], nb_pb), prev[1])
+
+                    for k in topk:
+                        k = int(k)
+                        if k == blank:
+                            continue
+                        new_pref = pref + (k,)
+                        add = (
+                            pb + float(lpt[k])
+                            if pref and pref[-1] == k
+                            else total + float(lpt[k])
+                        )
+                        prev = next_beams.get(new_pref, (-np.inf, -np.inf))
+                        next_beams[new_pref] = (prev[0], np.logaddexp(prev[1], add))
+
+                scored = [
+                    (pfx, s, np.logaddexp(s[0], s[1])) for pfx, s in next_beams.items()
+                ]
+                scored.sort(key=lambda x: x[2], reverse=True)
+                beams = {pfx: s for pfx, s, _ in scored[:beam_width]}
+
+            best = max(beams.items(), key=lambda kv: np.logaddexp(kv[1][0], kv[1][1]))[
+                0
+            ]
+            decoded = self.text_encoder.ctc_decode(list(best))
+            out.append(decoded)
+        return out
+
+    def _decode_beam_search_lm(
+        self,
+        log_probs,
+        log_probs_length,
+        beam_width=1500,
+        alpha=3.23,
+        beta=-0.26,
+        kenlm_files_name="librispeech-4-gram",
+    ):
+        """
+        Decode using beam search with language model.
+        """
 
     def _save_predictions(self, predictions, audio_paths, part):
         """
@@ -178,6 +249,54 @@ class Inferencer(BaseTrainer):
 
             with output_file.open("w", encoding="utf-8") as f:
                 f.write(prediction_text)
+
+    def _log_predictions(self, predictions, targets, audio_paths, part):
+        """
+        Log predictions to experiment tracker (CometML/TensorBoard).
+
+        Args:
+            predictions (list[str]): Text predictions.
+            targets (list[str]): Ground truth texts.
+            audio_paths (list[str]): Corresponding audio file paths.
+            part (str): Dataset partition name.
+        """
+        if self.writer is None:
+            return
+
+        examples_to_log = self.cfg_trainer.get("examples_to_log", 20)
+
+        tuples = list(zip(predictions, targets, audio_paths))
+        rows = {}
+
+        for pred, target, audio_path in tuples[:examples_to_log]:
+            target = self.text_encoder.normalize_text(target)
+            wer = self._calc_wer(target, pred) * 100
+            cer = self._calc_cer(target, pred) * 100
+
+            rows[Path(audio_path).name] = {
+                "target": target,
+                "prediction": pred,
+                "WER": f"{wer:.1f}",
+                "CER": f"{cer:.1f}",
+            }
+
+        import pandas as pd
+
+        self.writer.add_table(
+            f"predictions_{part}", pd.DataFrame.from_dict(rows, orient="index")
+        )
+
+    def _calc_wer(self, target, prediction):
+        """Calculate Word Error Rate."""
+        from src.metrics.utils import calc_wer
+
+        return calc_wer(target, prediction)
+
+    def _calc_cer(self, target, prediction):
+        """Calculate Character Error Rate."""
+        from src.metrics.utils import calc_cer
+
+        return calc_cer(target, prediction)
 
     def process_batch(self, batch_idx, batch, metrics, part):
         """
@@ -207,20 +326,25 @@ class Inferencer(BaseTrainer):
         outputs = self.model(**batch)
         batch.update(outputs)
 
+        log_probs = batch["log_probs"].cpu()
+        log_probs_length = batch["log_probs_length"].cpu()
+
+        predictions = self._decode_predictions(log_probs, log_probs_length)
+        batch["predictions"] = predictions
+        batch_size = log_probs.shape[0]
+        audio_paths = batch.get("audio_path", [None] * batch_size)
+
+        # Save predictions to files
+        if self.save_path is not None:
+            self._save_predictions(predictions, audio_paths, part)
+
+        # Store predictions for logging
+        batch["predictions"] = predictions
+        batch["prediction_audio_paths"] = audio_paths
+
         if metrics is not None:
             for met in self.metrics["inference"]:
                 metrics.update(met.name, met(**batch))
-
-        if self.save_path is not None:
-            log_probs = batch["log_probs"].cpu()
-            log_probs_length = batch["log_probs_length"].cpu()
-
-            predictions = self._decode_predictions(log_probs, log_probs_length)
-
-            batch_size = log_probs.shape[0]
-            audio_paths = batch.get("audio_path", [None] * batch_size)
-
-            self._save_predictions(predictions, audio_paths, part)
 
         return batch
 
@@ -244,6 +368,11 @@ class Inferencer(BaseTrainer):
         if self.save_path is not None:
             (self.save_path / part).mkdir(exist_ok=True, parents=True)
 
+        # Collect predictions for logging
+        all_predictions = []
+        all_targets = []
+        all_audio_paths = []
+
         with torch.no_grad():
             for batch_idx, batch in tqdm(
                 enumerate(dataloader),
@@ -257,9 +386,26 @@ class Inferencer(BaseTrainer):
                     metrics=self.evaluation_metrics,
                 )
 
+                # Collect data for logging
+                if self.writer is not None:
+                    all_predictions.extend(batch.get("predictions", []))
+                    all_targets.extend(batch.get("text", []))
+                    all_audio_paths.extend(batch.get("prediction_audio_paths", []))
+
         results = self.evaluation_metrics.result()
+        if self.writer is not None:
+            self.writer.add_scalars(results)
         if self.logger:
             for key, value in results.items():
                 self.logger.info(f"  {key}: {value}")
+
+        # Log predictions to experiment tracker
+        if self.writer is not None and len(all_predictions) > 0:
+            self.writer.set_step(0, mode=f"inference_{part}")
+            self._log_predictions(all_predictions, all_targets, all_audio_paths, part)
+            if self.logger:
+                self.logger.info(
+                    f"Logged {len(all_predictions)} predictions to experiment tracker"
+                )
 
         return results

@@ -96,6 +96,11 @@ class Trainer(BaseTrainer):
         for loss_name in self.config.writer.loss_names:
             metrics.update(loss_name, batch[loss_name].item())
 
+        if not self.is_train:
+            batch["predictions"] = self._decode_predictions_for_logging(
+                batch["log_probs"], batch["log_probs_length"]
+            )
+
         for met in metric_funcs:
             metrics.update(met.name, met(**batch))
         return batch
@@ -120,7 +125,6 @@ class Trainer(BaseTrainer):
             self.log_spectrogram(**batch)
             self.log_audio(**batch)
         else:
-            # Log Stuff
             self.log_spectrogram(**batch)
             self.log_audio(**batch)
             self.log_predictions(**batch)
@@ -149,6 +153,21 @@ class Trainer(BaseTrainer):
                 beam_width=self.beam_search_beam_width,
             )
             return pred
+        elif self.decoding_strategy == "beam_search_lm":
+            beam_width = self.cfg_trainer.get("lm_beam_width", 50)
+            lm_path = self.cfg_trainer.get("lm_path", None)
+            alpha = self.cfg_trainer.get("lm_alpha", 0.5)
+            beta = self.cfg_trainer.get("lm_beta", 1.0)
+
+            pred = self.text_encoder.ctc_beam_search_lm_decode(
+                probs=log_probs.cpu(),
+                probs_length=log_probs_length.cpu(),
+                beam_width=beam_width,
+                lm_path=lm_path,
+                alpha=alpha,
+                beta=beta,
+            )
+            return pred
         elif self.decoding_strategy == "argmax":
             pred, _ = self.text_encoder.ctc_argmax_decode(
                 log_probs.cpu(), log_probs_length.cpu()
@@ -163,6 +182,7 @@ class Trainer(BaseTrainer):
         if self.writer is None:
             return
 
+        examples_to_log = self.cfg_trainer.get("examples_to_log", examples_to_log)
         pred = self._decode_predictions_for_logging(log_probs, log_probs_length)
 
         tuples = list(zip(pred, text, audio_path))

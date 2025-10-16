@@ -1,0 +1,26 @@
+defaults:
+  - model: conformer_M_bpe
+  - writer: cometml
+  - metrics: inference_universal
+  - datasets: inference
+  - dataloader: librispeech
+  - transforms: base_augs
+  - _self_
+
+text_encoder:
+  _target_: src.text_encoder.BPETextEncoder
+  model_path: "bpe_model.model"
+
+
+inferencer:
+  device_tensors: ["spectrogram", "spectrogram_length", "text_encoded"]
+  device: auto
+  save_path: "librispeech_predictions"
+  seed: 1
+  from_pretrained: "saved/testing/model_best.pth"
+  save_dir: "saved"
+  run_name: "librispeech_inference"
+  decode_method: "beam_search"  # "argmax", "beam_search", or "beam_search_lm"
+  beam_width: 30
+  log_results: true
+  examples_to_log: 20
