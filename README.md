@@ -20,8 +20,8 @@ The model was evaluated on the standard LibriSpeech test sets. Below are the fin
 
 | Dataset       | WER   |  CER   |
 |---------------|-------|--------|
-| `test-clean`  |  26.9 |  10.7  |
-| `test-other`  |  52.8 |  26.7  |
+| `test-clean`  |  19.8 |  7.7   |
+| `test-other`  |  38.4 |  17.8  |
 
 
 

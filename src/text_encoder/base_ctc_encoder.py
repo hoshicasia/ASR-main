@@ -51,6 +51,7 @@ class BaseCTCTextEncoder:
         return self.raw_decode([i for i in result])
 
     def ctc_argmax_decode(self, log_probs, log_probs_length):
+        """Argmax decoding"""
         decoded = []
         raw = []
         for i in range(len(log_probs)):
@@ -60,44 +61,37 @@ class BaseCTCTextEncoder:
             raw.append(self.raw_decode(argm))
         return decoded, raw
 
-    def ctc_beam_search_decode(self, log_probs, probs_length, beam_width=10):
-        """Prefix beam search"""
-        import numpy as np
+    def ctc_beam_search_decode(self, probs, probs_length, beam_width=10):
+        """BeamSearch without LM"""
         import torch
 
-        lp = torch.tensor(log_probs.detach().cpu().numpy())
-        B = lp.shape[0]
+        probs = torch.softmax(probs, dim=-1).cpu().numpy()
+
         out = []
-        for b in range(B):
-            p = lp[b][: probs_length[b]]
-            T, V = p.shape
-            beam = {(): (0.0, -np.inf)}
-            for t in range(T):
-                pt = p[t]
-                new = {}
-                for prefix, (pb, pnb) in beam.items():
-                    cb, cn = new.get(prefix, (-np.inf, -np.inf))
-                    new[prefix] = (np.logaddexp(cb, np.logaddexp(pb, pnb) + pt[0]), cn)
-                    last = prefix[-1] if prefix else None
-                    for c in range(1, V):
-                        npref = prefix + (c,)
-                        cb2, cn2 = new.get(npref, (-np.inf, -np.inf))
-                        if last == c:
-                            cn2 = np.logaddexp(cn2, pb + pt[c])
+        for row, L in zip(probs, probs_length):
+            L = int(L)
+            beam = {("", 0): 1.0}
+            for step in row[:L]:
+                new_beam = defaultdict(float)
+                for (pref, last), p_pref in beam.items():
+                    for idx, p_t in enumerate(step):
+                        ch = self.ind2token[idx]
+                        if ch == last:
+                            new_pref = pref
                         else:
-                            cn2 = np.logaddexp(cn2, np.logaddexp(pb, pnb) + pt[c])
-                        new[npref] = (cb2, cn2)
-                items = sorted(
-                    new.items(),
-                    key=lambda kv: np.logaddexp(kv[1][0], kv[1][1]),
-                    reverse=True,
-                )[:beam_width]
+                            if ch == 0:
+                                new_pref = pref
+                            else:
+                                new_pref = pref + ch
+
+                        new_beam[(new_pref, ch)] += p_pref * float(p_t)
+                items = sorted(new_beam.items(), key=lambda x: -x[1])[:beam_width]
                 beam = dict(items)
-            if not beam:
-                out.append("")
-                continue
-            best = max(beam.items(), key=lambda kv: np.logaddexp(kv[1][0], kv[1][1]))[0]
-            out.append(self.raw_decode(list(best)) if best else "")
+            final = {}
+            for (pref, _), p in beam.items():
+                final[pref] = final.get(pref, 0.0) + p
+            best = max(final.items(), key=lambda x: x[1])[0] if final else ""
+            out.append(best)
         return out
 
     def build_lm_decoder(self, labels, lm_path, alpha=0.5, beta=1.0):

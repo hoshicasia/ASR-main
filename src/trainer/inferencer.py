@@ -127,7 +127,7 @@ class Inferencer(BaseTrainer):
                 log_probs,
                 log_probs_length,
                 beam_width=self.cfg_trainer.get("beam_width", 50),
-                alpha=self.cfg_trainer.get("lm_alpha", 0.5),
+                alpha=self.cfg_trainer.get("lm_alpha", 0.0),
                 beta=self.cfg_trainer.get("lm_beta", 0.0),
             )
         else:
@@ -153,72 +153,23 @@ class Inferencer(BaseTrainer):
 
     def _decode_beam_search(self, log_probs, log_probs_length, beam_width=None):
         """
-        CTC Beam Search
+        Decode using beam search approach.
+
         Args:
             log_probs (Tensor): Log probabilities of shape [batch_size, seq_len, vocab_size].
             log_probs_length (Tensor): Length of each sequence in the batch.
-            beam_width (int | None): Beam width for the search. If None, uses default from config.
+
         Returns:
             list[str]: Decoded text predictions.
         """
-        import numpy as np
+        beam_width = self.cfg_trainer.get("beam_width", 10)
 
-        if beam_width is None:
-            beam_width = int(self.cfg_trainer.get("beam_width", 10))
-        lp = log_probs.detach().cpu().numpy()
-        lens = log_probs_length.detach().cpu().numpy().astype(int)
-
-        blank = 0
-        B = lp.shape[0]
-        out = []
-
-        for b in range(B):
-            T = int(lens[b])
-            if T == 0:
-                out.append("")
-                continue
-
-            probs = lp[b, :T, :]
-            V = probs.shape[1]
-            beams = {(): (0.0, -np.inf)}
-
-            for t in range(T):
-                lpt = probs[t]
-                next_beams = {}
-                topk = np.argsort(-lpt)[: min(V, beam_width + 5)]
-
-                for pref, (pb, pnb) in beams.items():
-                    total = np.logaddexp(pb, pnb)
-
-                    nb_pb = total + float(lpt[blank])
-                    prev = next_beams.get(pref, (-np.inf, -np.inf))
-                    next_beams[pref] = (np.logaddexp(prev[0], nb_pb), prev[1])
-
-                    for k in topk:
-                        k = int(k)
-                        if k == blank:
-                            continue
-                        new_pref = pref + (k,)
-                        add = (
-                            pb + float(lpt[k])
-                            if pref and pref[-1] == k
-                            else total + float(lpt[k])
-                        )
-                        prev = next_beams.get(new_pref, (-np.inf, -np.inf))
-                        next_beams[new_pref] = (prev[0], np.logaddexp(prev[1], add))
-
-                scored = [
-                    (pfx, s, np.logaddexp(s[0], s[1])) for pfx, s in next_beams.items()
-                ]
-                scored.sort(key=lambda x: x[2], reverse=True)
-                beams = {pfx: s for pfx, s, _ in scored[:beam_width]}
-
-            best = max(beams.items(), key=lambda kv: np.logaddexp(kv[1][0], kv[1][1]))[
-                0
-            ]
-            decoded = self.text_encoder.ctc_decode(list(best))
-            out.append(decoded)
-        return out
+        batch_results = self.text_encoder.ctc_beam_search_decode(
+            log_probs,
+            probs_length=[int(x) for x in log_probs_length],
+            beam_width=beam_width,
+        )
+        return batch_results
 
     def _save_predictions(self, predictions, audio_paths, part):
         """
