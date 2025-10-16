@@ -126,6 +126,7 @@ class Inferencer(BaseTrainer):
             return self._decode_beam_search_lm(
                 log_probs,
                 log_probs_length,
+                lm_path=self.cfg_trainer.get("lm_path", None),
                 beam_width=self.cfg_trainer.get("beam_width", 50),
                 alpha=self.cfg_trainer.get("lm_alpha", 0.0),
                 beta=self.cfg_trainer.get("lm_beta", 0.0),
@@ -170,6 +171,18 @@ class Inferencer(BaseTrainer):
             beam_width=beam_width,
         )
         return batch_results
+
+    def _decode_beam_search_lm(
+        self, log_probs, log_probs_length, lm_path, beam_width, alpha, beta
+    ):
+        return self.text_encoder.ctc_beam_search_lm_decode(
+            probs=log_probs,
+            probs_length=log_probs_length,
+            lm_path=lm_path,
+            beam_width=beam_width,
+            alpha=alpha,
+            beta=beta,
+        )
 
     def _save_predictions(self, predictions, audio_paths, part):
         """
