@@ -20,10 +20,10 @@ inferencer:
   from_pretrained: "saved/testing/model_best.pth"
   save_dir: "saved"
   run_name: "librispeech_inference"
-  decode_method: "beam_search_lm"  # "argmax", "beam_search", or "beam_search_lm"
-  beam_width: 1000
+  decode_method: "argmax"  # "argmax", "beam_search", or "beam_search_lm"
+  beam_width: 20
   lm_path: "librispeech-4-gram"
-  lm_alpha: 0.4
+  lm_alpha: 0.3
   lm_beta: 0.6
   log_results: true
   examples_to_log: 20
