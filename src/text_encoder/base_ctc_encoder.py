@@ -95,14 +95,19 @@ class BaseCTCTextEncoder:
         return out
 
     def build_lm_decoder(self, labels, lm_path, alpha=0.5, beta=1.0):
+        key = (lm_path, float(alpha), float(beta))
+
         if (
-            self._lm_decoder is None
-            or getattr(self._lm_decoder, "model_path", None) != lm_path
+            getattr(self, "_lm_decoder_key", None) != key
+            or getattr(self, "_lm_decoder", None) is None
         ):
             self._lm_decoder = build_ctcdecoder(
                 labels=labels, kenlm_model_path=lm_path, alpha=alpha, beta=beta
             )
             self._lm_decoder.model_path = lm_path
+            self._lm_decoder.alpha = alpha
+            self._lm_decoder.beta = beta
+            self._lm_decoder_key = key
 
         return self._lm_decoder
 
@@ -110,12 +115,16 @@ class BaseCTCTextEncoder:
         self, probs, probs_length, lm_path, beam_width=50, alpha=0.5, beta=1.0
     ):
         """BeamSearch-LM with pyctcdecode"""
+        from torchaudio.models.decoder import download_pretrained_files
+
+        files = download_pretrained_files(lm_path)
 
         probs = probs.detach().cpu().numpy()
         V = probs.shape[-1]
         labels = [self.ind_to_token(i) for i in range(V)]
-        decoder = self.build_lm_decoder(labels, lm_path, alpha=alpha, beta=beta)
+        decoder = self.build_lm_decoder(labels, files.lm, alpha=alpha, beta=beta)
         results = []
+
         for i in range(probs.shape[0]):
             logp = probs[i][: probs_length[i]].astype(np.float32)
             decoded = decoder.decode(logp, beam_width=beam_width)

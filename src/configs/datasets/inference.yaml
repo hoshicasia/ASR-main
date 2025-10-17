@@ -1,4 +1,6 @@
 test:
-  _target_: src.datasets.librispeech_dataset.LibrispeechDataset
-  part: "test-clean"
-  instance_transforms: ${transforms.instance_transforms.inference}
+  _target_: torch.utils.data.ConcatDataset
+  datasets:
+    - _target_: src.datasets.librispeech_dataset.LibrispeechDataset
+      part: "test-other"
+      instance_transforms: ${transforms.instance_transforms.inference}

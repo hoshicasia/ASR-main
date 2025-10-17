@@ -14,16 +14,26 @@ train:
         max_gain_in_db: 3
         p: 0.2
 
-      - _target_: src.transforms.wav_augs.pitch_shift.PitchShift
-        sample_rate: 16000
-        min_transpose_semitones: -4.0
-        max_transpose_semitones: 6.0
+      # - _target_: src.transforms.wav_augs.pitch_shift.PitchShift
+      #   sample_rate: 16000
+      #   min_transpose_semitones: -2.0
+      #   max_transpose_semitones: 2.0
+      #   p: 0.2
+
+      # - _target_: src.transforms.wav_augs.speed.Speed
+      #   min_speed: 0.9
+      #   max_speed: 1.1
+      #   p: 0.2
+
+      - _target_: src.transforms.wav_augs.noise.Noise
+        min_snr_db: 20
+        max_snr_db: 30
         p: 0.2
 
-      - _target_: src.transforms.wav_augs.speed.Speed
-        min_speed: 0.9
-        max_speed: 1.1
-        p: 0.2
+      - _target_: src.transforms.spec_augs.spec_augment.SpecAugment
+        freq_mask_param: 20
+        time_mask_param: 50
+        p: 0.5
 
 inference:
   get_spectrogram:

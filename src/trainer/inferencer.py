@@ -123,13 +123,15 @@ class Inferencer(BaseTrainer):
         if decode_method == "beam_search":
             return self._decode_beam_search(log_probs, log_probs_length)
         elif decode_method == "beam_search_lm":
+            from torchaudio.models.decoder import download_pretrained_files
+
             return self._decode_beam_search_lm(
                 log_probs,
                 log_probs_length,
-                lm_path=self.cfg_trainer.get("lm_path", None),
-                beam_width=self.cfg_trainer.get("beam_width", 50),
-                alpha=self.cfg_trainer.get("lm_alpha", 0.0),
-                beta=self.cfg_trainer.get("lm_beta", 0.0),
+                lm_path=self.cfg_trainer.get("lm_path", "librispeech-4-gram"),
+                beam_width=self.cfg_trainer.get("beam_width"),
+                alpha=self.cfg_trainer.get("lm_alpha"),
+                beta=self.cfg_trainer.get("lm_beta"),
             )
         else:
             return self._decode_argmax(log_probs, log_probs_length)
