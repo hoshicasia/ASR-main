@@ -43,11 +43,12 @@ chmod +x download_checkpoints.sh
 ```
 
 ## Inference
-To run inference on the LibriSpeech test dataset:
+To run inference on the LibriSpeech test dataset (default: test-clean):
 
 ```bash
 python inference.py -cn=inference_bpe writer=none text_encoder.model_path=data/bpe_model.model inferencer.from_pretrained=data/best_model/
 ```
+Among the options for evaluation: argmax, beam_search, beam_search_lm. The latter one is recommended.
 
 You can also use your own dataset in the following format:
 
@@ -80,7 +81,7 @@ python scripts/calc_metrics.py --pred_dir=your/predictions/dir --target_dir=your
 
 If you wish to replicate training process, follow this steps:
 
-0. (Optional) By default this project uses BPE model with vocabulary size 300 trained on librispeech-clean text corpus.
+0. (Optional) By default this project uses BPE model with vocabulary size 300 trained on librispeech text corpus.
    If you want to train your own BPE model, run the following:
 
 
@@ -97,7 +98,7 @@ python train.py -cn=baseline_bpe text_encoder.model_path=data/bpe_model.model wr
 2. Fine-tuning
 
 ```bash
-python train.py -cn=finetune_bpe text_encoder.model_path=data/bpe_model.model trainer.resume_from=path/to/last/model/checkpoint
+python train.py -cn=finetune_bpe_p1 text_encoder.model_path=data/bpe_model.model trainer.resume_from=path/to/last/model/checkpoint
 ```
 
 ## Demo
@@ -116,6 +117,7 @@ This project uses CometML for logging, to use it set up your API key or choose w
 4. [SentencePiece (BPE)](https://github.com/google/sentencepiece) — subword tokenizer used for BPE model
 5. [PyTorch](https://pytorch.org/) — DL framework used in the project
 6. [CometML](https://www.comet.com/site/) - platform for logging used in the project.
+7. [pyctcdecode](https://github.com/kensho-technologies/pyctcdecode) + [KenLM](https://github.com/kpu/kenlm) - combo used for LM-fusion evaluation.
 
 
 ## Credits
